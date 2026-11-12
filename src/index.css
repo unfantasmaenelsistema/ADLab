@@ -1,0 +1,171 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: #f8fafc;
+    color: #0f172a;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    transition: background-color 150ms ease, color 150ms ease;
+  }
+
+  html.dark body {
+    background-color: #090d16;
+    color: #e2e8f0;
+  }
+
+  code, pre, .font-mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Professional IT Console Dark Mode Surface Overrides (Windows Admin Center / Azure Portal Dark) */
+html.dark .adlab-console {
+  background-color: #090d16;
+  color: #e2e8f0;
+}
+
+html.dark .adlab-console .bg-white {
+  background-color: #0f172a;
+}
+
+html.dark .adlab-console .bg-white\/70 {
+  background-color: rgba(15, 23, 42, 0.75);
+}
+
+html.dark .adlab-console .bg-slate-50,
+html.dark .adlab-console .bg-slate-50\/50,
+html.dark .adlab-console .bg-slate-50\/60,
+html.dark .adlab-console .bg-slate-50\/70 {
+  background-color: #0b1120;
+}
+
+html.dark .adlab-console .bg-slate-100,
+html.dark .adlab-console .bg-slate-100\/70 {
+  background-color: #1e293b;
+}
+
+html.dark .adlab-console .hover\:bg-slate-50:hover {
+  background-color: #162033;
+}
+
+html.dark .adlab-console .hover\:bg-slate-100:hover,
+html.dark .adlab-console .hover\:bg-slate-200:hover {
+  background-color: #26354d;
+}
+
+html.dark .adlab-console .border-slate-200,
+html.dark .adlab-console .border-slate-300 {
+  border-color: #1e293b;
+}
+
+html.dark .adlab-console .border-slate-100 {
+  border-color: #162033;
+}
+
+html.dark .adlab-console .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #1e293b;
+}
+
+html.dark .adlab-console .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #162033;
+}
+
+html.dark .adlab-console .text-slate-900 {
+  color: #f8fafc;
+}
+
+html.dark .adlab-console .text-slate-800 {
+  color: #e2e8f0;
+}
+
+html.dark .adlab-console .text-slate-700 {
+  color: #cbd5e1;
+}
+
+html.dark .adlab-console .text-slate-600 {
+  color: #94a3b8;
+}
+
+html.dark .adlab-console .text-slate-500 {
+  color: #64748b;
+}
+
+/* Active selection states in Dark Console */
+html.dark .adlab-console .bg-sky-50,
+html.dark .adlab-console .bg-sky-50\/90 {
+  background-color: rgba(2, 132, 199, 0.2);
+}
+
+html.dark .adlab-console .bg-emerald-50,
+html.dark .adlab-console .bg-emerald-50\/40,
+html.dark .adlab-console .bg-emerald-50\/70,
+html.dark .adlab-console .bg-emerald-50\/80,
+html.dark .adlab-console .bg-emerald-50\/90 {
+  background-color: rgba(5, 150, 105, 0.18);
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+html.dark .adlab-console .text-emerald-950,
+html.dark .adlab-console .text-emerald-900,
+html.dark .adlab-console .text-emerald-800,
+html.dark .adlab-console .text-emerald-700 {
+  color: #6ee7b7;
+}
+
+html.dark .adlab-console .bg-amber-50,
+html.dark .adlab-console .bg-amber-50\/60 {
+  background-color: rgba(217, 119, 6, 0.16);
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+html.dark .adlab-console .text-amber-950,
+html.dark .adlab-console .text-amber-900,
+html.dark .adlab-console .text-amber-800,
+html.dark .adlab-console .text-amber-700 {
+  color: #fcd34d;
+}
+
+html.dark .adlab-console .bg-red-50 {
+  background-color: rgba(220, 38, 38, 0.16);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+html.dark .adlab-console .text-red-950,
+html.dark .adlab-console .text-red-900,
+html.dark .adlab-console .text-red-800,
+html.dark .adlab-console .text-red-700 {
+  color: #fca5a5;
+}
+
+html.dark .adlab-console .text-sky-700 {
+  color: #38bdf8;
+}
+
+html.dark .adlab-console .text-indigo-700 {
+  color: #818cf8;
+}
+
+html.dark .adlab-console input[type="text"],
+html.dark .adlab-console select {
+  background-color: #162033;
+  color: #f1f5f9;
+  border-color: #334155;
+}
+
+html.dark .adlab-console input[type="text"]::placeholder {
+  color: #64748b;
+}

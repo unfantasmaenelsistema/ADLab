@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 660" width="1200" height="660">
+  <defs>
+    <style>
+      .font-sans { font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+      .font-mono { font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="660" fill="#F8FAFC" rx="8"/>
+
+  <!-- Top Bar -->
+  <rect width="1200" height="46" fill="#0F172A"/>
+  <text x="24" y="28" fill="#FFFFFF" class="font-sans" font-size="15" font-weight="700">ADLab MMC Console</text>
+  <text x="230" y="28" fill="#CBD5E1" class="font-sans" font-size="12">Usuarios y Equipos (dsa.msc)</text>
+  <text x="415" y="28" fill="#FFFFFF" class="font-sans" font-size="12" font-weight="700" text-decoration="underline">GPOs en OU (2)</text>
+  <text x="530" y="28" fill="#CBD5E1" class="font-sans" font-size="12">Almacén GPOs (5)</text>
+  <text x="655" y="28" fill="#CBD5E1" class="font-sans" font-size="12">RSoP / Simulación</text>
+
+  <!-- Left Tree -->
+  <rect x="0" y="46" width="280" height="614" fill="#FFFFFF"/>
+  <line x1="280" y1="46" x2="280" y2="660" stroke="#E2E8F0"/>
+  <text x="16" y="74" fill="#334155" class="font-sans" font-size="12" font-weight="700">Árbol de Consola (gpmc.msc)</text>
+  <line x1="0" y1="86" x2="280" y2="86" stroke="#E2E8F0"/>
+  <text x="20" y="114" fill="#0F172A" class="font-sans" font-size="12">▾ 🌐 adlab.local</text>
+  <text x="36" y="138" fill="#0F172A" class="font-sans" font-size="12">▾ 📂 Corporativo</text>
+  <rect x="0" y="148" width="280" height="26" fill="#0284C7"/>
+  <text x="52" y="165" fill="#FFFFFF" class="font-sans" font-size="12" font-weight="600">📁 Ventas  ⚠️</text>
+  <text x="52" y="192" fill="#334155" class="font-sans" font-size="12">📁 Sistemas</text>
+  <text x="20" y="236" fill="#065F46" class="font-sans" font-size="12" font-weight="700">▾ 🗄️ Objetos de directiva de grupo (5)</text>
+  <text x="40" y="260" fill="#047857" class="font-sans" font-size="11" font-weight="600">📄 GPO_Estaciones_Ventas</text>
+  <text x="40" y="282" fill="#475569" class="font-sans" font-size="11">📄 GPO_Seguridad_Critica_CISO</text>
+  <text x="40" y="304" fill="#475569" class="font-sans" font-size="11">📄 GPO_Identidad_Corporativa</text>
+
+  <!-- Center Panel: Linked GPOs -->
+  <rect x="281" y="46" width="520" height="614" fill="#FFFFFF"/>
+  <line x1="801" y1="46" x2="801" y2="660" stroke="#E2E8F0"/>
+  <text x="300" y="76" fill="#0F172A" class="font-sans" font-size="14" font-weight="700">adlab.local / Corporativo / Ventas</text>
+
+  <!-- Block Inheritance Checkbox -->
+  <rect x="530" y="56" width="250" height="28" rx="4" fill="#FFFBEB" stroke="#FCD34D"/>
+  <text x="545" y="74" fill="#92400E" class="font-sans" font-size="11" font-weight="700">☑️ Bloquear herencia (Block Inheritance)</text>
+
+  <text x="300" y="116" fill="#0F172A" class="font-sans" font-size="12" font-weight="700">Vínculos de GPO en "Ventas" (Orden de Precedencia Local)</text>
+  <text x="300" y="134" fill="#64748B" class="font-sans" font-size="11">El Orden #1 tiene la máxima prioridad local en esta OU.</text>
+
+  <!-- Linked GPOs Table -->
+  <rect x="300" y="150" width="482" height="120" rx="4" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <rect x="300" y="150" width="482" height="30" fill="#F8FAFC"/>
+  <text x="312" y="169" fill="#475569" class="font-sans" font-size="11" font-weight="700">Orden</text>
+  <text x="365" y="169" fill="#475569" class="font-sans" font-size="11" font-weight="700">Directiva GPO</text>
+  <text x="535" y="169" fill="#475569" class="font-sans" font-size="11" font-weight="700">Forzar (Enforced)</text>
+  <text x="665" y="169" fill="#475569" class="font-sans" font-size="11" font-weight="700">Precedencia</text>
+
+  <rect x="301" y="180" width="480" height="42" fill="#ECFDF5"/>
+  <text x="314" y="205" fill="#0F172A" class="font-mono" font-size="12" font-weight="700">#1</text>
+  <text x="365" y="205" fill="#065F46" class="font-sans" font-size="12" font-weight="600">📄 GPO_Estaciones_Ventas</text>
+  <text x="535" y="205" fill="#047857" class="font-sans" font-size="11" font-weight="600">☑️ Sí (Forzado)</text>
+  <text x="680" y="205" fill="#475569" class="font-sans" font-size="12">▲  ▼  🗑️</text>
+
+  <text x="314" y="248" fill="#0F172A" class="font-mono" font-size="12">#2</text>
+  <text x="365" y="248" fill="#334155" class="font-sans" font-size="12">📄 GPO_WindowsUpdate_Diferido</text>
+  <text x="535" y="248" fill="#64748B" class="font-sans" font-size="11">☐ No</text>
+  <text x="680" y="248" fill="#475569" class="font-sans" font-size="12">▲  ▼  🗑️</text>
+
+  <!-- Right Panel: GPMC Editor -->
+  <rect x="802" y="46" width="398" height="614" fill="#F8FAFC"/>
+  <rect x="820" y="70" width="362" height="560" rx="6" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <text x="838" y="96" fill="#0F172A" class="font-sans" font-size="13" font-weight="700">Editor de Administración de Directivas (GPMC)</text>
+  <text x="838" y="114" fill="#64748B" class="font-sans" font-size="11">Directiva base: GPO_Estaciones_Ventas</text>
+
+  <text x="838" y="146" fill="#334155" class="font-sans" font-size="11" font-weight="700">Filtrado de Seguridad (Security Filtering)</text>
+  <rect x="838" y="154" width="326" height="28" rx="4" fill="#F8FAFC" stroke="#CBD5E1"/>
+  <text x="848" y="172" fill="#0F172A" class="font-sans" font-size="11">Solo miembros del grupo: GG_Ventas (Global) ▾</text>
+
+  <text x="838" y="204" fill="#334155" class="font-sans" font-size="11" font-weight="700">1. AppLocker (Control de Ejecución)</text>
+  <rect x="838" y="212" width="326" height="28" rx="4" fill="#F8FAFC" stroke="#CBD5E1"/>
+  <text x="848" y="230" fill="#0F172A" class="font-sans" font-size="11">Bloquear ejecutables fuera de Program Files ▾</text>
+
+  <text x="838" y="262" fill="#334155" class="font-sans" font-size="11" font-weight="700">2. Desktop Wallpaper (Active Desktop)</text>
+  <rect x="838" y="270" width="326" height="28" rx="4" fill="#F8FAFC" stroke="#CBD5E1"/>
+  <text x="848" y="288" fill="#0F172A" class="font-sans" font-size="11">Tapiz Departamento Ventas (bg_comercial.jpg) ▾</text>
+
+  <text x="838" y="322" fill="#334155" class="font-sans" font-size="11" font-weight="700">5. Restricciones de Sistema (Plantillas Administrativas)</text>
+  <text x="838" y="346" fill="#334155" class="font-sans" font-size="11">☑️ Bloquear Panel de Control (control.exe)</text>
+  <text x="838" y="368" fill="#334155" class="font-sans" font-size="11">☑️ Bloquear Símbolo del Sistema (cmd.exe)</text>
+  <text x="838" y="390" fill="#334155" class="font-sans" font-size="11">☐ Deshabilitar Editor de Registro (regedit.exe)</text>
+
+  <text x="838" y="426" fill="#334155" class="font-sans" font-size="11" font-weight="700">6. Despliegue de Software (Paquetes MSI)</text>
+  <rect x="838" y="438" width="326" height="28" rx="4" fill="#ECFDF5" stroke="#A7F3D0"/>
+  <text x="850" y="456" fill="#065F46" class="font-mono" font-size="11">📦 DynamicsCRM_Client.msi</text>
+</svg>
