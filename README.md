@@ -1,8 +1,17 @@
 # 🛡️ ADLab — Simulador Educativo de Active Directory, AGDLP y Directivas de Grupo (GPO / RSoP)
 
+<p align="left">
+  <a href="https://www.unfantasmaenelsistema.com/" target="_blank" rel="noopener noreferrer">
+    <img src="./public/assets/aistudio/icono_81a3db5b.png" alt="Un Fantasma en el Sistema" height="96" />
+  </a>
+</p>
+
+**Un proyecto de [Un Fantasma en el Sistema — https://www.unfantasmaenelsistema.com/](https://www.unfantasmaenelsistema.com/)**
+
 ![Windows Server](https://img.shields.io/badge/Windows_Server-2022_%2F_2025-0078D4?style=flat-square&logo=windows)
 ![Active Directory](https://img.shields.io/badge/Active_Directory-dsa.msc_%7C_gpmc.msc_%7C_rsop.msc-0284C7?style=flat-square)
 ![Arquitectura](https://img.shields.io/badge/100%25_Client--Side-GitHub_Pages_Ready-059669?style=flat-square)
+![Web Oficial](https://img.shields.io/badge/Web-unfantasmaenelsistema.com-0284C7?style=flat-square)
 ![Licencia](https://img.shields.io/badge/Licencia-Apache_2.0-slate?style=flat-square)
 
 **ADLab** es un laboratorio interactivo de administración de sistemas Windows Server que se ejecuta **100% en el navegador** (sin servidores backend ni máquinas virtuales pesadas). Permite a estudiantes y docentes de **Administración de Sistemas Informáticos en Red (ASIR)**, **Ingeniería Informática** y certificaciones **Microsoft (AZ-800 / MD-102)** practicar en tiempo real:

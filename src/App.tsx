@@ -47,6 +47,7 @@ import {
   Moon,
   RotateCcw,
   History,
+  ExternalLink,
 } from 'lucide-react';
 import {
   ADEnvironment,
@@ -119,6 +120,8 @@ interface GPOHistoryEntry {
 
 const GPO_HISTORY_STORAGE_KEY = 'adlab_gpo_history_v1';
 const MAX_GPO_HISTORY_ITEMS = 5;
+const AUTHOR_LOGO_URL = `${import.meta.env.BASE_URL}assets/aistudio/icono_81a3db5b.png`;
+const AUTHOR_WEB_URL = 'https://www.unfantasmaenelsistema.com/';
 
 /**
  * Resalta visualmente las coincidencias del término de búsqueda dentro de cualquier texto
@@ -1647,17 +1650,46 @@ export default function App() {
   return (
     <div className={`adlab-console min-h-screen flex flex-col bg-slate-50 text-slate-900 ${darkMode ? 'dark' : ''}`}>
       {/* TOP BAR CONTRACT: 3 Zonas */}
-      <header className="flex items-center justify-between gap-6 px-6 py-3 bg-slate-900 text-slate-100 border-b border-slate-800">
-        <a
-          href="#top"
-          onClick={(e) => {
-            e.preventDefault();
-            handleSelectOUInTree(env.rootOuId || '');
-          }}
-          className="text-base font-bold tracking-tight text-white whitespace-nowrap shrink-0"
-        >
-          ADLab MMC Console
-        </a>
+      <header className="flex items-center justify-between gap-4 px-5 py-2.5 bg-slate-900 text-slate-100 border-b border-slate-800">
+        <div className="flex items-center gap-3 shrink-0">
+          <a
+            href={AUTHOR_WEB_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Visitar Un Fantasma en el Sistema (https://www.unfantasmaenelsistema.com/)"
+            className="flex items-center gap-2.5 group shrink-0"
+          >
+            <span className="inline-flex items-center justify-center p-1 rounded-lg bg-white/95 shadow-xs ring-1 ring-slate-700/60 group-hover:ring-sky-400 transition-all shrink-0">
+              <img
+                src={AUTHOR_LOGO_URL}
+                alt="Logo Un Fantasma en el Sistema"
+                className="h-9 w-auto object-contain shrink-0 select-none"
+              />
+            </span>
+          </a>
+
+          <div className="flex flex-col">
+            <a
+              href="#top"
+              onClick={(e) => {
+                e.preventDefault();
+                handleSelectOUInTree(env.rootOuId || '');
+              }}
+              className="text-base font-bold tracking-tight text-white hover:text-sky-300 transition-colors whitespace-nowrap leading-tight"
+            >
+              ADLab MMC Console
+            </a>
+            <a
+              href={AUTHOR_WEB_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-sky-400 hover:text-sky-300 hover:underline transition-colors whitespace-nowrap"
+            >
+              <span>unfantasmaenelsistema.com</span>
+              <ExternalLink className="w-3 h-3 shrink-0" />
+            </a>
+          </div>
+        </div>
 
         <nav className="hidden lg:flex items-center gap-5 text-xs font-medium text-slate-300">
           <button
@@ -2151,7 +2183,7 @@ export default function App() {
             </div>
           </div>
 
-          <div className="p-3 border-t border-slate-200 bg-slate-50 text-xs text-slate-500">
+          <div className="p-3 border-t border-slate-200 bg-slate-50 text-xs text-slate-500 space-y-2.5">
             <label className="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
               <input
                 type="checkbox"
@@ -2161,6 +2193,29 @@ export default function App() {
               />
               <span>Validación Educativa AGDLP Estricta</span>
             </label>
+
+            <a
+              href={AUTHOR_WEB_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2.5 p-2 rounded-md bg-white border border-slate-200 hover:border-sky-400 transition-colors group"
+              title="Ir a https://www.unfantasmaenelsistema.com/"
+            >
+              <img
+                src={AUTHOR_LOGO_URL}
+                alt="Un Fantasma en el Sistema"
+                className="h-9 w-auto object-contain shrink-0 select-none"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="text-[11px] font-semibold text-slate-800 group-hover:text-sky-700 truncate flex items-center gap-1">
+                  <span>Un Fantasma en el Sistema</span>
+                  <ExternalLink className="w-3 h-3 shrink-0 text-sky-600" />
+                </div>
+                <div className="text-[10px] text-slate-500 truncate">
+                  www.unfantasmaenelsistema.com
+                </div>
+              </div>
+            </a>
           </div>
         </aside>
 
@@ -4841,6 +4896,37 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* FOOTER CON LOGO Y ENLACE OFICIAL */}
+      <footer className="px-6 py-2.5 bg-slate-900 text-slate-300 border-t border-slate-800 flex flex-wrap items-center justify-between gap-4 text-xs">
+        <div className="flex items-center gap-3">
+          <a
+            href={AUTHOR_WEB_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2.5 hover:text-white transition-colors group"
+          >
+            <span className="inline-flex items-center justify-center p-0.5 rounded bg-white/95 shadow-2xs shrink-0">
+              <img
+                src={AUTHOR_LOGO_URL}
+                alt="Un Fantasma en el Sistema"
+                className="h-7 w-auto object-contain shrink-0"
+              />
+            </span>
+            <span className="font-semibold text-white group-hover:text-sky-300 transition-colors">
+              Un Fantasma en el Sistema
+            </span>
+            <span className="text-slate-500">—</span>
+            <span className="text-sky-400 group-hover:underline inline-flex items-center gap-1">
+              https://www.unfantasmaenelsistema.com/
+              <ExternalLink className="w-3 h-3 shrink-0" />
+            </span>
+          </a>
+        </div>
+        <div className="text-slate-400 text-[11px]">
+          ADLab · Simulador Educativo de Active Directory, AGDLP y Directivas de Grupo (GPO / RSoP)
+        </div>
+      </footer>
     </div>
   );
 }
