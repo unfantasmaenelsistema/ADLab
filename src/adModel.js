@@ -223,6 +223,40 @@ export const GPO_PRESET_OPTIONS = Object.freeze({
 });
 
 /**
+ * Mitad de la GPO a la que pertenece cada ajuste (Configuración del equipo / Configuración de usuario).
+ * Sirve para respetar el "Estado de GPO" de GPMC (configuración de usuario o de equipo deshabilitada).
+ */
+export const GPO_SETTING_SIDE = Object.freeze({
+  appLocker: 'computer',
+  windowsUpdate: 'computer',
+  deploySoftware: 'computer',
+  passwordMinLength: 'computer',
+  wallpaper: 'user',
+  proxy: 'user',
+  disableControlPanel: 'user',
+  disableCmd: 'user',
+  disableRegistryTools: 'user',
+  driveMaps: 'user',
+});
+
+export const GPO_STATUS_OPTIONS = Object.freeze([
+  { value: 'Enabled', label: 'Habilitado' },
+  { value: 'UserDisabled', label: 'Configuración de usuario deshabilitada' },
+  { value: 'ComputerDisabled', label: 'Configuración del equipo deshabilitada' },
+  { value: 'AllDisabled', label: 'Todos los valores deshabilitados' },
+]);
+
+/** ¿Aplica este ajuste de la GPO según su estado? */
+export function isGPOSettingActive(gpo, key) {
+  const status = gpo?.gpoStatus || 'Enabled';
+  if (status === 'AllDisabled') return false;
+  const side = GPO_SETTING_SIDE[key];
+  if (status === 'UserDisabled' && side === 'user') return false;
+  if (status === 'ComputerDisabled' && side === 'computer') return false;
+  return true;
+}
+
+/**
  * Catálogo de Retos Guiados / Exámenes Autocorregibles para clase
  */
 export const LAB_CHALLENGES = Object.freeze([
@@ -914,13 +948,16 @@ export class ADEnvironment {
     }
 
     const effectiveGroups = Array.from(effectiveGroupMap.values());
+    // Solo los grupos de seguridad entran en el token de acceso: los de distribución no dan permisos
+    const securityGroups = effectiveGroups.filter((g) => g.category !== GroupCategory.DISTRIBUTION);
     const effectivePermissions = [
-      ...new Set(effectiveGroups.flatMap((g) => g.permissions || [])),
+      ...new Set(securityGroups.flatMap((g) => g.permissions || [])),
     ];
 
     return {
       directGroups,
       effectiveGroups,
+      securityGroups,
       effectivePermissions,
     };
   }
@@ -1099,8 +1136,8 @@ export class ADEnvironment {
       return true;
     }
 
-    const { effectiveGroups } = this.getUserEffectiveGroupsAndPermissions(user.id);
-    const effectiveGroupNames = new Set(effectiveGroups.map((g) => g.name.toLowerCase()));
+    const { securityGroups } = this.getUserEffectiveGroupsAndPermissions(user.id);
+    const effectiveGroupNames = new Set(securityGroups.map((g) => g.name.toLowerCase()));
 
     return gpo.securityFiltering.some((filterTarget) => {
       const normalized = String(filterTarget).trim().toLowerCase();
@@ -1124,6 +1161,7 @@ export class ADEnvironment {
     let regularQueue = []; // GPOs normales sujetas a BlockInheritance
     const enforcedQueue = []; // GPOs forzadas (inmunes a BlockInheritance y prevalecen al final)
 
+    let enforcedOrder = [];
     hierarchy.forEach((currentOU) => {
       if (currentOU.blockInheritance) {
         regularQueue = [];
@@ -1133,20 +1171,25 @@ export class ADEnvironment {
         .filter((link) => link.ouId === currentOU.id && link.linkEnabled)
         .sort((a, b) => b.linkOrder - a.linkOrder);
 
+      const enforcedHere = [];
       linksInOU.forEach((link) => {
         const gpo = this.gpos[link.gpoId];
         if (!gpo || gpo.gpoStatus === 'AllDisabled') return;
 
         const entry = { gpo, link, sourceOU: currentOU };
         if (link.enforced) {
-          enforcedQueue.unshift(entry);
+          enforcedHere.push(entry);
         } else {
           regularQueue.push(entry);
         }
       });
+      // Forzados: gana el más cercano a la raíz y, dentro de una OU, el Orden #1 → se aplican los últimos
+      enforcedOrder = [...enforcedHere, ...enforcedOrder];
     });
+    enforcedQueue.push(...enforcedOrder);
 
     const appliedOrder = [...regularQueue, ...enforcedQueue];
+    const rootId = this.rootOuId;
 
     const resultantSettings = {
       appLocker: null,
@@ -1168,8 +1211,13 @@ export class ADEnvironment {
       windowsUpdate: null,
     };
 
-    appliedOrder.forEach(({ gpo }) => {
-      const s = gpo.settings;
+    appliedOrder.forEach(({ gpo, sourceOU }) => {
+      // Ajustes de la mitad deshabilitada de la GPO (Estado de GPO) no se aplican
+      const s = Object.fromEntries(
+        Object.entries(gpo.settings).filter(([key]) => isGPOSettingActive(gpo, key))
+      );
+      // Las directivas de cuenta (contraseñas) solo surten efecto desde GPOs vinculadas al dominio
+      if (sourceOU.id !== rootId) delete s.passwordMinLength;
       if (s.appLocker !== null && s.appLocker !== undefined && s.appLocker !== '') {
         resultantSettings.appLocker = s.appLocker;
         winningGPOs.appLocker = gpo.name;
@@ -1240,8 +1288,10 @@ export class ADEnvironment {
     const blockedGPOs = []; // GPOs descartadas por Block Inheritance o Security Filtering
     const hierarchySteps = []; // Traza nodo por nodo para mostrar en la UI
 
+    let enforcedOrder = [];
     hierarchy.forEach((currentOU) => {
       const blockedAtThisLevel = [];
+      const enforcedHere = [];
 
       // Regla 2: Si esta OU tiene "Bloquear Herencia", descarta las GPOs normales heredadas de OUs superiores
       if (currentOU.blockInheritance && regularQueue.length > 0) {
@@ -1296,12 +1346,15 @@ export class ADEnvironment {
 
         if (link.enforced) {
           // Regla 3: Las GPOs Forzadas nunca se bloquean y tienen máxima prioridad
-          enforcedQueue.unshift(entry);
+          enforcedHere.push(entry);
         } else {
           // Regla 1: Las GPOs normales se apilan de arriba hacia abajo (la OU hija va después y sobrescribe)
           regularQueue.push(entry);
         }
       });
+
+      // Entre forzadas gana la más cercana a la raíz y, dentro de la misma OU, el Orden #1
+      enforcedOrder = [...enforcedHere, ...enforcedOrder];
 
       hierarchySteps.push({
         ou: currentOU,
@@ -1311,6 +1364,7 @@ export class ADEnvironment {
       });
     });
 
+    enforcedQueue.push(...enforcedOrder);
     const effectiveOrder = [...regularQueue, ...enforcedQueue];
 
     const settingDefinitions = [
@@ -1387,7 +1441,7 @@ export class ADEnvironment {
       let finalValue = null;
 
       const blockedContributors = blockedGPOs
-        .filter(({ gpo }) => def.isConfigured(gpo.settings[def.key]))
+        .filter(({ gpo }) => isGPOSettingActive(gpo, def.key) && def.isConfigured(gpo.settings[def.key]))
         .map(({ gpo, sourceOU, blockedByOU, filteredBySecurity, linkOrder, enforced }) => ({
           gpoName: gpo.name,
           sourceOUName: sourceOU.name,
@@ -1400,6 +1454,7 @@ export class ADEnvironment {
         }));
 
       effectiveOrder.forEach((entry) => {
+        if (!isGPOSettingActive(entry.gpo, def.key)) return;
         const rawVal = entry.gpo.settings[def.key];
         if (!def.isConfigured(rawVal)) return;
 
@@ -1576,18 +1631,25 @@ export class ADEnvironment {
    * que automatiza la creación completa de la infraestructura actual en Windows Server 2022/2025.
    */
   generatePowerShellDeploymentScript() {
+    // Escapa texto para una cadena PowerShell entre comillas dobles (`, $ y " se escapan con acento grave)
+    const ps = (val) => String(val ?? '').replace(/[`$"]/g, (c) => `\`${c}`);
+    const rootDN = this.getDistinguishedName('', this.rootOuId);
     const lines = [
       '# ============================================================================',
       `# ADLab - Script de Despliegue Automatizado Windows Server PowerShell`,
       `# Dominio: ${this.domainName} (${this.netbiosName})`,
       `# Generado: ${new Date().toISOString()}`,
       '# Requisitos: Windows Server 2019/2022/2025 con rol AD DS y GPMC instalados',
+      '# Ejecútalo en un controlador de dominio de LABORATORIO, no en producción.',
       '# ============================================================================',
       '',
       'Import-Module ActiveDirectory',
       'Import-Module GroupPolicy',
       '',
       '$ErrorActionPreference = "Stop"',
+      '',
+      '# Contraseña inicial común: se pide al ejecutar y los usuarios deberán cambiarla en su primer inicio de sesión',
+      '$PasswordInicial = Read-Host -AsSecureString "Contraseña inicial para las cuentas nuevas"',
       '',
       '# 1. CREACIÓN JERÁRQUICA DE UNIDADES ORGANIZATIVAS (OUs)',
     ];
@@ -1607,15 +1669,11 @@ export class ADEnvironment {
       if (!ou.isDomainRoot) {
         const parentDN = this.getDistinguishedName('', ou.parentId);
         lines.push(
-          `New-ADOrganizationalUnit -Name "${ou.name}" -Path "${parentDN}" -Description "${ou.description || ''}" -ProtectedFromAccidentalDeletion $true`
+          `New-ADOrganizationalUnit -Name "${ps(ou.name)}" -Path "${ps(parentDN)}" -Description "${ps(ou.description)}" -ProtectedFromAccidentalDeletion $true`
         );
         if (ou.blockInheritance) {
-          const thisDN = this.getDistinguishedName('', ou.id);
-          lines.push(`Set-GPInheritance -Target "${thisDN}" -IsBlocked Yes`);
+          lines.push(`Set-GPInheritance -Target "${ps(this.getDistinguishedName('', ou.id))}" -IsBlocked Yes`);
         }
-      } else if (ou.blockInheritance) {
-        const rootDN = this.getDistinguishedName('', ou.id);
-        lines.push(`Set-GPInheritance -Target "${rootDN}" -IsBlocked Yes`);
       }
 
       (ou.childrenIds || []).forEach((childId) => queue.push(childId));
@@ -1625,66 +1683,98 @@ export class ADEnvironment {
     Object.values(this.users).forEach((u) => {
       const ouDN = this.getDistinguishedName('', u.ouId);
       lines.push(
-        `New-ADUser -Name "${u.displayName}" -SamAccountName "${u.samAccountName}" -UserPrincipalName "${u.samAccountName}@${this.domainName}" -Path "${ouDN}" -Department "${u.department || ''}" -Title "${u.title || ''}" -AccountPassword (ConvertTo-SecureString "P@ssw0rd2026!" -AsPlainText -Force) -Enabled $${u.enabled ? 'true' : 'false'}`
+        `New-ADUser -Name "${ps(u.displayName)}" -SamAccountName "${ps(u.samAccountName)}" -UserPrincipalName "${ps(u.samAccountName)}@${this.domainName}" -Path "${ps(ouDN)}" -Department "${ps(u.department)}" -Title "${ps(u.title)}" -AccountPassword $PasswordInicial -ChangePasswordAtLogon $true -Enabled $${u.enabled ? 'true' : 'false'}`
       );
     });
 
-    lines.push('', '# 3. CREACIÓN DE GRUPOS DE SEGURIDAD (Global, Universal, DomainLocal)');
+    lines.push('', '# 3. CREACIÓN DE GRUPOS (Global, Universal, DomainLocal)');
     Object.values(this.groups).forEach((g) => {
       const ouDN = this.getDistinguishedName('', g.ouId);
       lines.push(
-        `New-ADGroup -Name "${g.name}" -GroupScope ${g.scope} -GroupCategory ${g.category} -Path "${ouDN}" -Description "${g.description || ''}"`
+        `New-ADGroup -Name "${ps(g.name)}" -GroupScope ${g.scope} -GroupCategory ${g.category || 'Security'} -Path "${ps(ouDN)}" -Description "${ps(g.description)}"`
       );
     });
 
     lines.push('', '# 4. ANIDAMIENTO AGDLP (Add-ADGroupMember: A -> G -> U -> DL)');
     Object.values(this.groups).forEach((g) => {
-      if (g.memberUserIds.length > 0) {
-        const members = g.memberUserIds
-          .map((uid) => this.users[uid]?.samAccountName)
-          .filter(Boolean)
-          .map((s) => `"${s}"`)
-          .join(', ');
-        if (members) {
-          lines.push(`Add-ADGroupMember -Identity "${g.name}" -Members ${members}`);
-        }
-      }
-      if (g.memberGroupIds.length > 0) {
-        const nested = g.memberGroupIds
-          .map((gid) => this.groups[gid]?.name)
-          .filter(Boolean)
-          .map((n) => `"${n}"`)
-          .join(', ');
-        if (nested) {
-          lines.push(`Add-ADGroupMember -Identity "${g.name}" -Members ${nested}`);
-        }
+      const members = [
+        ...g.memberUserIds.map((uid) => this.users[uid]?.samAccountName),
+        ...g.memberGroupIds.map((gid) => this.groups[gid]?.name),
+      ]
+        .filter(Boolean)
+        .map((s) => `"${ps(s)}"`)
+        .join(', ');
+      if (members) {
+        lines.push(`Add-ADGroupMember -Identity "${ps(g.name)}" -Members ${members}`);
       }
     });
 
-    lines.push('', '# 5. CREACIÓN DE OBJETOS DE DIRECTIVA DE GRUPO (GPOs) Y VÍNCULOS');
+    lines.push('', '# 5. CREACIÓN DE OBJETOS DE DIRECTIVA DE GRUPO (GPOs) Y SUS AJUSTES');
+    const statusMap = {
+      UserDisabled: 'UserSettingsDisabled',
+      ComputerDisabled: 'ComputerSettingsDisabled',
+      AllDisabled: 'AllSettingsDisabled',
+    };
     Object.values(this.gpos).forEach((gpo) => {
-      if (gpo.name !== 'Default Domain Policy') {
-        lines.push(`New-GPO -Name "${gpo.name}" -Comment "${gpo.description || ''}"`);
+      const name = ps(gpo.name);
+      const s = gpo.settings;
+      const isDefault = gpo.name === 'Default Domain Policy';
+      lines.push('', `# --- ${gpo.name} ---`);
+      if (!isDefault) {
+        lines.push(`New-GPO -Name "${name}" -Comment "${ps(gpo.description)}" | Out-Null`);
       }
-      if (gpo.settings.wallpaper) {
+      if (s.wallpaper) {
         lines.push(
-          `Set-GPRegistryValue -Name "${gpo.name}" -Key "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System" -ValueName "Wallpaper" -Type String -Value "${gpo.settings.wallpaper}"`
+          `Set-GPRegistryValue -Name "${name}" -Key "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System" -ValueName "Wallpaper" -Type String -Value "${ps(s.wallpaper)}"`
         );
       }
-      if (gpo.settings.disableControlPanel) {
+      if (s.disableControlPanel) {
         lines.push(
-          `Set-GPRegistryValue -Name "${gpo.name}" -Key "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer" -ValueName "NoControlPanel" -Type DWord -Value 1`
+          `Set-GPRegistryValue -Name "${name}" -Key "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer" -ValueName "NoControlPanel" -Type DWord -Value 1`
         );
       }
-      if (gpo.settings.disableCmd) {
+      if (s.disableCmd) {
         lines.push(
-          `Set-GPRegistryValue -Name "${gpo.name}" -Key "HKCU\\Software\\Policies\\Microsoft\\Windows\\System" -ValueName "DisableCMD" -Type DWord -Value 2`
+          `Set-GPRegistryValue -Name "${name}" -Key "HKCU\\Software\\Policies\\Microsoft\\Windows\\System" -ValueName "DisableCMD" -Type DWord -Value 2`
         );
       }
-      if (gpo.settings.disableRegistryTools) {
+      if (s.disableRegistryTools) {
         lines.push(
-          `Set-GPRegistryValue -Name "${gpo.name}" -Key "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System" -ValueName "DisableRegistryTools" -Type DWord -Value 2`
+          `Set-GPRegistryValue -Name "${name}" -Key "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System" -ValueName "DisableRegistryTools" -Type DWord -Value 2`
         );
+      }
+      // Ajustes que no se crean con Set-GPRegistryValue: se dejan indicados para configurarlos en gpmc.msc
+      if (s.appLocker) lines.push(`# Pendiente en GPMC (AppLocker): ${s.appLocker}`);
+      if (s.proxy) lines.push(`# Pendiente en GPMC (Preferencias > Configuración de Internet / Proxy): ${s.proxy}`);
+      if (s.windowsUpdate) lines.push(`# Pendiente en GPMC (Windows Update / WSUS): ${s.windowsUpdate}`);
+      if (Array.isArray(s.deploySoftware) && s.deploySoftware.length) {
+        lines.push(`# Pendiente en GPMC (Instalación de software, paquetes en un recurso compartido): ${s.deploySoftware.join(', ')}`);
+      }
+      if (s.passwordMinLength !== null && s.passwordMinLength !== undefined) {
+        const linkedAtDomain = Object.values(this.gpoLinks).some((l) => l.gpoId === gpo.id && l.ouId === this.rootOuId);
+        lines.push(
+          linkedAtDomain
+            ? `Set-ADDefaultDomainPasswordPolicy -Identity "${this.domainName}" -MinPasswordLength ${Number(s.passwordMinLength)}`
+            : `# Longitud mínima de contraseña (${s.passwordMinLength}) ignorada: las directivas de cuenta solo se aplican desde GPOs vinculadas al dominio`
+        );
+      }
+      if (statusMap[gpo.gpoStatus]) {
+        lines.push(`(Get-GPO -Name "${name}").GpoStatus = "${statusMap[gpo.gpoStatus]}"`);
+      }
+      const filters = (gpo.securityFiltering || []).filter((t) => !/^(authenticated users|usuarios autentificados)$/i.test(t));
+      if (filters.length > 0) {
+        // Filtrado de seguridad: Authenticated Users conserva Lectura (necesaria desde MS16-072) pero deja de Aplicar
+        lines.push(
+          `Set-GPPermission -Name "${name}" -TargetName "Authenticated Users" -TargetType Group -PermissionLevel GpoRead -Replace | Out-Null`
+        );
+        filters.forEach((target) => {
+          const isUser = Object.values(this.users).some(
+            (u) => u.samAccountName.toLowerCase() === String(target).toLowerCase()
+          );
+          lines.push(
+            `Set-GPPermission -Name "${name}" -TargetName "${ps(target)}" -TargetType ${isUser ? 'User' : 'Group'} -PermissionLevel GpoApply | Out-Null`
+          );
+        });
       }
     });
 
@@ -1698,15 +1788,19 @@ export class ADEnvironment {
         const targetDN = this.getDistinguishedName('', ou.id);
         const enforcedFlag = link.enforced ? 'Yes' : 'No';
         const enabledFlag = link.linkEnabled ? 'Yes' : 'No';
+        // La Default Domain Policy ya está vinculada al dominio al crearlo: se ajusta con Set-GPLink
+        const cmdlet = gpo.name === 'Default Domain Policy' && ou.id === this.rootOuId ? 'Set-GPLink' : 'New-GPLink';
         lines.push(
-          `New-GPLink -Name "${gpo.name}" -Target "${targetDN}" -LinkEnabled ${enabledFlag} -Enforced ${enforcedFlag} -Order ${link.linkOrder}`
+          `${cmdlet} -Name "${ps(gpo.name)}" -Target "${ps(targetDN)}" -LinkEnabled ${enabledFlag} -Enforced ${enforcedFlag} -Order ${link.linkOrder} | Out-Null`
         );
       });
 
+    const sampleUser = Object.values(this.users)[0];
     lines.push(
       '',
       '# 7. AUDITORÍA RSoP DE EJEMPLO',
-      '# Get-GPResultantSetOfPolicy -User "agarcia" -ReportType Html -Path "C:\\RSoP_agarcia.html"'
+      `# Get-GPResultantSetOfPolicy -User "${sampleUser ? ps(sampleUser.samAccountName) : 'usuario'}" -ReportType Html -Path "C:\\RSoP.html"`,
+      `# Dominio raíz: ${rootDN}`
     );
 
     return lines.join('\n');

@@ -1,6 +1,0 @@
-{
-  "name": "ADLab - Active Directory & GPO Simulator",
-  "description": "Simulador educativo client-side de Active Directory, modelo AGDLP y directivas de grupo (GPO) en Windows Server.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
