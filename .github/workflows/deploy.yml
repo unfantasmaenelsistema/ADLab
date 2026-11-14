@@ -2,9 +2,7 @@ name: Desplegar ADLab en GitHub Pages
 
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -14,34 +12,39 @@ permissions:
 
 concurrency:
   group: 'pages'
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout del repositorio
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
-      - name: Configurar Node.js 22
-        uses: actions/setup-node@v4
+      # AI Studio trabaja con Bun y solo hay bun.lock (con npm y caché de npm el despliegue fallaba)
+      - name: Configurar Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: 22
-          cache: 'npm'
+          bun-version: latest
 
       - name: Instalar dependencias
-        run: npm install
+        run: bun install --frozen-lockfile
 
-      - name: Compilar aplicación para producción
-        run: npm run build -- --base="./"
+      - name: Comprobar tipos
+        run: bun run lint
+
+      - name: Compilar para GitHub Pages
+        run: bun run build
+        env:
+          GITHUB_PAGES: 'true'
 
       - name: Configurar GitHub Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: Subir artefacto estático (dist)
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
-          path: './dist'
+          path: ./dist
 
   deploy:
     environment:
@@ -52,4 +55,4 @@ jobs:
     steps:
       - name: Desplegar en GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

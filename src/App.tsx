@@ -55,6 +55,7 @@ import {
   AGDLPValidationError,
   GPO_PRESET_OPTIONS,
   LAB_CHALLENGES,
+  GPO_STATUS_OPTIONS,
 } from './adModel.js';
 
 type ObjectTypeFilter = 'all' | 'ou' | 'user' | 'group' | 'gpo';
@@ -122,6 +123,7 @@ const GPO_HISTORY_STORAGE_KEY = 'adlab_gpo_history_v1';
 const MAX_GPO_HISTORY_ITEMS = 5;
 const AUTHOR_LOGO_URL = `${import.meta.env.BASE_URL}assets/aistudio/icono_81a3db5b.png`;
 const AUTHOR_WEB_URL = 'https://www.unfantasmaenelsistema.com/';
+const LOADED_CHALLENGE_KEY = 'adlab_loaded_challenge_v1';
 
 /**
  * Resalta visualmente las coincidencias del término de búsqueda dentro de cualquier texto
@@ -192,9 +194,27 @@ export default function App() {
   const [selectedOuId, setSelectedOuId] = useState<string>(() => env.rootOuId || '');
   const [centerViewMode, setCenterViewMode] = useState<CenterViewMode>('ou-directory');
   const [gpoContainerExpanded, setGpoContainerExpanded] = useState<boolean>(true);
+  // Reto cuyo escenario está cargado (se guarda para que tras recargar se evalúe el reto correcto)
+  const [loadedChallengeId, setLoadedChallengeId] = useState<string | null>(() => {
+    try {
+      const saved = localStorage.getItem(LOADED_CHALLENGE_KEY);
+      return LAB_CHALLENGES.some((c) => c.id === saved) ? saved : null;
+    } catch {
+      return null;
+    }
+  });
   const [activeChallengeId, setActiveChallengeId] = useState<string>(
-    LAB_CHALLENGES[0].id
+    () => loadedChallengeId || LAB_CHALLENGES[0].id
   );
+
+  useEffect(() => {
+    try {
+      if (loadedChallengeId) localStorage.setItem(LOADED_CHALLENGE_KEY, loadedChallengeId);
+      else localStorage.removeItem(LOADED_CHALLENGE_KEY);
+    } catch {
+      // Almacenamiento no disponible
+    }
+  }, [loadedChallengeId]);
 
   // Pila de historial de las últimas 5 acciones de configuración de GPO (con soporte Undo)
   const [gpoActionHistory, setGpoActionHistory] = useState<GPOHistoryEntry[]>(() => {
@@ -314,6 +334,18 @@ export default function App() {
       LAB_CHALLENGES,
     });
   }, [env, version]);
+
+  // Escape cierra el selector de objetos, los modales de creación y el menú Archivo
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setObjectPicker(null);
+      setModalMode(null);
+      setFileMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const commitChange = () => {
     env.saveToLocalStorage();
@@ -490,6 +522,7 @@ export default function App() {
   const handleResetEnvironment = () => {
     const fresh: any = ADEnvironment.createSeededEnvironment();
     fresh.saveToLocalStorage();
+    setLoadedChallengeId(null);
     applyImportedEnvironment(fresh, 'Entorno restaurado al estado inicial de laboratorio.');
   };
 
@@ -544,6 +577,7 @@ export default function App() {
     try {
       const rawText = await file.text();
       const importedEnv = ADEnvironment.importFromSnapshotJSON(rawText);
+      setLoadedChallengeId(null);
       applyImportedEnvironment(
         importedEnv,
         `Escenario "${file.name}" importado (${Object.keys(importedEnv.ous).length} OUs, ${Object.keys(importedEnv.users).length} usuarios, ${Object.keys(importedEnv.gpos).length} GPOs).`
@@ -558,6 +592,7 @@ export default function App() {
   const handleLoadTeacherChallenge = (challengeId = 'challenge-gpo-inheritance') => {
     const challengeEnv = ADEnvironment.createTeacherChallengeEnvironment(challengeId);
     setActiveChallengeId(challengeId);
+    setLoadedChallengeId(challengeId);
     applyImportedEnvironment(
       challengeEnv,
       `Escenario de reto cargado: ${LAB_CHALLENGES.find((c) => c.id === challengeId)?.title}`
@@ -597,6 +632,11 @@ export default function App() {
   const challengeEvaluation = useMemo(() => {
     return env.evaluateLabChallenge(activeChallengeId);
   }, [env, activeChallengeId, version]);
+  // Solo tiene sentido puntuar el reto cuyo escenario está cargado
+  const isActiveChallengeLoaded = loadedChallengeId === activeChallengeId;
+  const challengeBadge = loadedChallengeId
+    ? env.evaluateLabChallenge(loadedChallengeId).score
+    : '–';
 
   const domainAuditFindings = useMemo(() => {
     return env.runDomainHealthAudit();
@@ -1329,6 +1369,44 @@ export default function App() {
           </div>
         </div>
 
+        {/* Estado de GPO (GPMC → Detalles → Estado de GPO) */}
+        <div className="space-y-1">
+          <label className="block text-slate-700 font-medium" htmlFor={`gpo-status-${gpo.id}`}>
+            Estado de GPO (GPO Status)
+          </label>
+          <select
+            id={`gpo-status-${gpo.id}`}
+            value={gpo.gpoStatus || 'Enabled'}
+            onChange={(e) => {
+              const next = e.target.value;
+              const label = GPO_STATUS_OPTIONS.find((o: any) => o.value === next)?.label || next;
+              recordGPOAction(
+                {
+                  category: 'Ajuste GPO',
+                  gpoName: gpo.name,
+                  summary: `Estado de GPO → ${label}`,
+                  targetEntity: { type: 'gpo', id: gpo.id },
+                },
+                () => {
+                  gpo.gpoStatus = next;
+                  gpo.updatedAt = new Date().toISOString();
+                }
+              );
+            }}
+            className="w-full px-2 py-1.5 border border-slate-300 rounded bg-white"
+          >
+            {GPO_STATUS_OPTIONS.map((o: any) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-slate-500">
+            Deshabilitar la configuración de usuario anula tapiz, proxy y restricciones de cmd, regedit y Panel de control;
+            la del equipo anula AppLocker, Windows Update y el despliegue de software.
+          </p>
+        </div>
+
         {/* Filtrado de Seguridad (Security Filtering) */}
         <div className="space-y-1">
           <label className="block text-slate-700 font-medium">
@@ -1650,7 +1728,7 @@ export default function App() {
   return (
     <div className={`adlab-console min-h-screen flex flex-col bg-slate-50 text-slate-900 ${darkMode ? 'dark' : ''}`}>
       {/* TOP BAR CONTRACT: 3 Zonas */}
-      <header className="flex items-center justify-between gap-4 px-5 py-2.5 bg-slate-900 text-slate-100 border-b border-slate-800">
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-2.5 bg-slate-900 text-slate-100 border-b border-slate-800">
         <div className="flex items-center gap-3 shrink-0">
           <a
             href={AUTHOR_WEB_URL}
@@ -1691,7 +1769,7 @@ export default function App() {
           </div>
         </div>
 
-        <nav className="hidden lg:flex items-center gap-5 text-xs font-medium text-slate-300">
+        <nav className="order-3 w-full lg:order-none lg:w-auto flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs font-medium text-slate-300">
           <button
             type="button"
             onClick={() => setCenterViewMode('ou-directory')}
@@ -1735,7 +1813,7 @@ export default function App() {
               centerViewMode === 'challenges-view' ? 'text-amber-300 underline underline-offset-4' : 'text-amber-200/90'
             }`}
           >
-            Retos Guiados ({challengeEvaluation.score})
+            Retos Guiados ({challengeBadge})
           </button>
           <button
             type="button"
@@ -1878,7 +1956,7 @@ export default function App() {
 
       {/* BARRA DE ACCIONES MMC */}
       <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-2.5 bg-white border-b border-slate-200">
-        <div className="flex items-center gap-2 overflow-x-auto">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => openModal('new-ou')}
@@ -1999,10 +2077,12 @@ export default function App() {
               <p className="text-red-800 leading-relaxed max-w-4xl">
                 {educationalError.message}
               </p>
-              <div className="pt-1 flex items-center gap-2 text-red-700 font-mono">
-                <BookOpen className="w-3.5 h-3.5 shrink-0" />
-                <span>Flujo recomendado Microsoft: {educationalError.expectedFlow}</span>
-              </div>
+              {educationalError.code !== 'AD_OPERATION_ERROR' && (
+                <div className="pt-1 flex items-center gap-2 text-red-700 font-mono">
+                  <BookOpen className="w-3.5 h-3.5 shrink-0" />
+                  <span>Flujo recomendado Microsoft: {educationalError.expectedFlow}</span>
+                </div>
+              )}
             </div>
           </div>
           <button
@@ -2018,7 +2098,7 @@ export default function App() {
       {/* WORKSPACE PRINCIPAL: 3 PANELES MMC */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 min-h-[calc(100vh-105px)]">
         {/* PANEL IZQUIERDO: Árbol de Directorio + GPMC + RSoP + Herramientas */}
-        <aside className="lg:col-span-3 xl:col-span-3 bg-white border-r border-slate-200 flex flex-col">
+        <aside className="min-w-0 lg:col-span-3 xl:col-span-3 bg-white border-r border-slate-200 flex flex-col">
           <div className="px-3.5 py-2.5 border-b border-slate-200 flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-700">
               Árbol de Consola (dsa.msc / gpmc.msc)
@@ -2159,7 +2239,7 @@ export default function App() {
                     centerViewMode === 'challenges-view' ? 'text-amber-100' : 'text-slate-500'
                   }`}
                 >
-                  {challengeEvaluation.score}
+                  {challengeBadge}
                 </span>
               </div>
 
@@ -2220,7 +2300,7 @@ export default function App() {
         </aside>
 
         {/* PANEL CENTRAL */}
-        <main className="lg:col-span-5 xl:col-span-5 bg-white border-r border-slate-200 flex flex-col">
+        <main className="min-w-0 lg:col-span-5 xl:col-span-5 bg-white border-r border-slate-200 flex flex-col">
           {centerViewMode === 'challenges-view' ? (
             /* ================================================================
                VISTA DE RETOS GUIADOS Y AUTOEVALUACIÓN DOCENTE
@@ -2232,7 +2312,9 @@ export default function App() {
                     Laboratorio de Autoevaluación · ADLab Training
                   </span>
                   <span className="font-mono font-bold text-amber-900">
-                    Progreso actual: {challengeEvaluation.score} objetivos
+                    {isActiveChallengeLoaded
+                      ? `Progreso actual: ${challengeEvaluation.score} objetivos`
+                      : 'Escenario no cargado'}
                   </span>
                 </div>
                 <h2 className="text-base font-bold text-slate-900">
@@ -2311,6 +2393,12 @@ export default function App() {
                       </div>
 
                       <div className="space-y-2">
+                        {!isActiveChallengeLoaded && (
+                          <div className="p-2.5 rounded border border-amber-300 bg-amber-50 text-amber-900">
+                            Este reto no está cargado: la verificación de abajo se calcula sobre el entorno actual. Pulsa
+                            <strong> Cargar Escenario</strong> para empezarlo con su topología.
+                          </div>
+                        )}
                         {challengeEvaluation.checks.map((chk: any, idx: number) => (
                           <div
                             key={idx}
@@ -2764,7 +2852,7 @@ export default function App() {
                     </div>
 
                     <div className="overflow-x-auto border border-slate-200 rounded">
-                      <table className="w-full text-left border-collapse">
+                      <div className="overflow-x-auto max-w-full"><table className="w-full text-left border-collapse">
                         <thead>
                           <tr className="border-b border-slate-200 bg-slate-50 font-semibold text-slate-600">
                             <th className="py-2.5 pl-3 pr-2">Configuración y Clave de Registro</th>
@@ -2916,7 +3004,7 @@ export default function App() {
                             </tr>
                           ))}
                         </tbody>
-                      </table>
+                      </table></div>
                     </div>
                   </div>
                 </>
@@ -2971,7 +3059,7 @@ export default function App() {
 
               <div className="flex-1 overflow-y-auto flex flex-col divide-y divide-slate-200">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
+                  <div className="overflow-x-auto max-w-full"><table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
                         <th className="py-2.5 pl-5 pr-3">Nombre de la GPO</th>
@@ -3048,7 +3136,7 @@ export default function App() {
                         );
                       })}
                     </tbody>
-                  </table>
+                  </table></div>
                 </div>
 
                 {/* PANEL DE ACCIONES RECIENTES EN GPOs (PILA DE HISTORIAL / UNDO — ÚLTIMOS 5 CAMBIOS) */}
@@ -3311,7 +3399,7 @@ export default function App() {
                       </p>
                     </div>
                   ) : (
-                    <table className="w-full text-left border-collapse">
+                    <div className="overflow-x-auto max-w-full"><table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
                           <th className="py-2.5 pl-4 pr-3">Nombre</th>
@@ -3428,7 +3516,7 @@ export default function App() {
                           );
                         })}
                       </tbody>
-                    </table>
+                    </table></div>
                   )}
 
                   {/* Coincidencias globales en otras Unidades Organizativas del Dominio */}
@@ -3518,7 +3606,7 @@ export default function App() {
                         No hay GPOs vinculadas directamente a la OU <strong>{currentOU.name}</strong>.
                       </div>
                     ) : (
-                      <table className="w-full text-left border-collapse border border-slate-200 rounded">
+                      <div className="overflow-x-auto max-w-full"><table className="w-full text-left border-collapse border border-slate-200 rounded">
                         <thead>
                           <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
                             <th className="py-2 pl-3 pr-2">Orden</th>
@@ -3704,7 +3792,7 @@ export default function App() {
                             );
                           })}
                         </tbody>
-                      </table>
+                      </table></div>
                     )}
                   </div>
 
@@ -3794,7 +3882,7 @@ export default function App() {
         </main>
 
         {/* PANEL DERECHO: Inspector de Propiedades */}
-        <aside className="lg:col-span-4 xl:col-span-4 bg-slate-50/50 flex flex-col">
+        <aside className="min-w-0 lg:col-span-4 xl:col-span-4 bg-slate-50/50 flex flex-col">
           <div className="px-5 py-3 border-b border-slate-200 bg-white flex items-center justify-between">
             <div className="flex items-center gap-2">
               <SlidersHorizontal className="w-4 h-4 text-slate-500" />
@@ -4917,7 +5005,7 @@ export default function App() {
               Un Fantasma en el Sistema
             </span>
             <span className="text-slate-500">—</span>
-            <span className="text-sky-400 group-hover:underline inline-flex items-center gap-1">
+            <span className="text-sky-400 group-hover:underline inline-flex flex-wrap break-all items-center gap-1">
               https://www.unfantasmaenelsistema.com/
               <ExternalLink className="w-3 h-3 shrink-0" />
             </span>
